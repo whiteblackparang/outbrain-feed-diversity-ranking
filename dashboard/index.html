@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Outbrain Feed Diversity Ranking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@500&family=Gaegu&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a href="#main-content" class="skip-link">본문 바로가기</a>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="kicker">Outbrain 데이터 기반 추천 다양성 & 정확도 Trade-off 분석</p>
+    <h1>정확한 추천은<br>왜 점점 좁아지는가</h1>
+    <p class="lede">
+      Outbrain 클릭 로그 8,700만 건을 세션 단위로 재구성해 딥러닝 랭킹 모델을 학습시키고,
+      MMR 다양성 재랭킹이 관련성과 맞바꾸는 지점을 직접 측정했다.
+    </p>
+    <div class="tags">
+      <span>Self-Attention</span>
+      <span>MMR Reranking</span>
+      <span>LLM 설명 생성</span>
+    </div>
+  </div>
+
+  <div class="pipeline wrap">
+    <p class="pipeline-flow">
+      <span>EDA</span>
+      <span aria-hidden="true">→</span>
+      <span>베이스라인</span>
+      <span aria-hidden="true">→</span>
+      <span>세션 어텐션</span>
+      <span aria-hidden="true">→</span>
+      <span>MMR 재랭킹</span>
+    </p>
+  </div>
+</header>
+
+<section class="eda wrap">
+  <h2>숫자로 보기 전에, 분포부터 봤다</h2>
+  <div class="eda-grid">
+    <figure>
+      <img src="assets/candidates_per_display.png" alt="session당 후보 광고 수 분포" decoding="async">
+      <figcaption>4개, 6개 지점에서 두 번 봉우리가 생기는 이봉분포 — 세션 구성에 어떤 규칙이 있을 가능성을 시사한다.</figcaption>
+    </figure>
+    <figure>
+      <img src="assets/category_topic_confidence.png" alt="category vs topic confidence_level 분포" decoding="async">
+      <figcaption>topic은 낮은 신뢰도에 몰려있는 반면, category는 0.9 근처에 뚜렷한 두 번째 봉우리가 있다 — 문서마다 확실한 주 카테고리가 존재함을 뜻한다.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<main id="main-content" class="layout wrap" tabindex="-1">
+  <div class="content">
+
+    <section class="metrics" aria-label="모델 성능 평가 지표">
+      <div class="metric">
+        <svg class="metric-icon" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="20" cy="20" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="20" cy="20" r="3" fill="currentColor"/></svg>
+        <span class="metric-value">0.704</span>
+        <span class="metric-label">인기도 베이스라인 AUC</span>
+        <span class="metric-note">단순 ad_id별 과거 CTR</span>
+      </div>
+      <div class="metric">
+        <svg class="metric-icon" viewBox="0 0 40 40" aria-hidden="true"><rect x="6" y="18" width="6" height="16" fill="none" stroke="currentColor" stroke-width="2"/><rect x="17" y="10" width="6" height="24" fill="none" stroke="currentColor" stroke-width="2"/><rect x="28" y="22" width="6" height="12" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        <span class="metric-value">0.580</span>
+        <span class="metric-label">카테고리 베이스라인 AUC</span>
+        <span class="metric-note">카테고리로 뭉치면 신호 손실</span>
+      </div>
+      <div class="metric accent">
+        <svg class="metric-icon" viewBox="0 0 40 40" aria-hidden="true"><circle cx="10" cy="10" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="30" cy="14" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="22" cy="30" r="4" fill="none" stroke="currentColor" stroke-width="2"/><line x1="10" y1="10" x2="30" y2="14" stroke="currentColor" stroke-width="1.5"/><line x1="10" y1="10" x2="22" y2="30" stroke="currentColor" stroke-width="1.5"/><line x1="30" y1="14" x2="22" y2="30" stroke="currentColor" stroke-width="1.5"/></svg>
+        <span class="metric-value">0.711</span>
+        <span class="metric-label">세션 어텐션 모델 AUC</span>
+        <span class="metric-note">같은 세션 후보를 함께 인코딩</span>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>관련성과 다양성은 맞바꿔야 한다</h2>
+      <p class="block-intro">
+        MMR의 λ(람다)는 재랭킹이 관련성에 얼마나 치우칠지를 정한다.
+        1에 가까울수록 클릭 확률이 높은 후보를 그대로 노출하고,
+        0.5에 가까울수록 서로 다른 카테고리·토픽을 섞어 노출한다.
+      </p>
+      <div class="chart-frame chart-container">
+        <canvas id="tradeoffChart" role="img" aria-label="람다 값에 따른 Hit Rate와 다양성 점수 트레이드오프 차트"></canvas>
+      </div>
+      <p class="chart-caption">
+        λ = 1.0에서 hit rate 0.940, 다양성 0.936. λ = 0.5에서는 hit rate 0.917, 다양성 0.953.
+        2.3%p의 정확도를 내주는 대가로 다양성이 눈에 띄게 늘어난다.
+      </p>
+
+      <figure class="notebook-ref">
+        <img src="assets/tradeoff_plot.png" alt="04_diversity_tradeoff.ipynb 실행 결과" loading="lazy">
+        <figcaption>04_diversity_tradeoff.ipynb 실행 결과 원본</figcaption>
+      </figure>
+    </section>
+
+    <section class="block">
+      <h2>재랭킹이 실제로 무엇을 했는지, 모델에게 물었다</h2>
+      <p class="block-intro">
+        MMR이 세션마다 어떤 판단을 내렸는지 하나하나 읽는 대신,
+        재랭킹 전후 다양성 점수 변화를 LLM에 전달해 두 문장 요약을 받았다.
+      </p>
+      <div id="explanationList" class="explanations" aria-live="polite"></div>
+    </section>
+
+    <section class="block">
+      <h2>세 번 방향을 틀었다</h2>
+      <ol class="pivots">
+        <li>
+          <svg class="pivot-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="M6 16a10 10 0 1 1 3 7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 19v4h4" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <div>
+            <p class="pivot-title">MIND → Outbrain</p>
+            <p>뉴스 추천용 MIND 데이터셋이 접근 승인제로 바뀌어 다운로드가 막혔다. 광고 클릭 예측 데이터셋인 Outbrain으로 방향을 바꿨다.</p>
+          </div>
+        </li>
+        <li>
+          <svg class="pivot-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="M6 16a10 10 0 1 1 3 7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 19v4h4" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <div>
+            <p class="pivot-title">엔티티 이름 기반 콜드스타트 → 재랭킹 설명 생성</p>
+            <p>Outbrain의 entity_id가 익명화된 해시라 실제 이름을 알 수 없다는 걸 뒤늦게 확인했다. LLM 활용처를 콘텐츠 이해에서 재랭킹 결과 설명으로 옮겼다.</p>
+          </div>
+        </li>
+        <li>
+          <svg class="pivot-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="M6 16a10 10 0 1 1 3 7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 19v4h4" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <div>
+            <p class="pivot-title">유저 히스토리 GRU → 세션 어텐션</p>
+            <p>유저의 86%가 재방문 이력이 없어 개인화 시퀀스 모델이 성립하지 않는다는 걸 발견했다. 같은 세션 내 후보 관계를 보는 구조로 바꿨다.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+  </div>
+
+  <aside class="rail">
+    <div class="note" style="--rotate: -1.2deg;">
+      <p>카테고리 베이스라인이 인기도보다 낮게 나와서 처음엔 코드가 잘못된 줄 알았다. 카테고리 단위로 뭉치면 개별 광고 신호가 사라진다는 걸 뒤늦게 이해했다.</p>
+    </div>
+    <div class="note" style="--rotate: 1deg;">
+      <p>GRU로 유저 시퀀스를 학습시키는 데 일주일을 썼는데, 유저 재방문 데이터의 86%가 비어있다는 걸 뒤늦게 발견했다. 이후로는 모델부터 짜지 않고 데이터 분포부터 본다.</p>
+    </div>
+    <div class="note" style="--rotate: -0.6deg;">
+      <p>λ를 하나 바꿀 때마다 뭘 얻고 뭘 잃는지 숫자보다 눈으로 먼저 보고 싶어서, 지표 표 대신 그래프부터 그렸다.</p>
+    </div>
+  </aside>
+
+</main>
+
+<footer class="wrap">
+  <p>데이터: Outbrain Click Prediction (Kaggle)</p>
+  <p>도구: pandas, PyTorch, scikit-learn, Groq(openai/gpt-oss-20b)</p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
